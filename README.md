@@ -1,49 +1,46 @@
-# Njalla module for Caddy
+Njalla for [Caddy](https://github.com/caddyserver/caddy)
+=======================
 
-This package contains a DNS provider module for [Caddy](https://github.com/caddyserver/caddy).
-It can be used to manage DNS records with [Njalla](https://njal.la) accounts,
-and to solve the ACME DNS-01 challenge.
+DNS provider module backed by [libdns/njalla](https://github.com/libdns/njalla).
+Use it to solve the ACME DNS-01 challenge and to manage records in Njalla zones.
 
-## Caddy module name
+Module name: `dns.providers.njalla`
 
-```
-dns.providers.njalla
-```
+## Install
 
-## Building
-
-This module is not part of the standard Caddy distribution. Build Caddy with it
-using [xcaddy](https://github.com/caddyserver/xcaddy):
+Caddy does not ship this module. Build it in with
+[xcaddy](https://github.com/caddyserver/xcaddy):
 
 ```sh
 xcaddy build --with github.com/caddy-dns/njalla
 ```
 
-A `Dockerfile` is included for building a Caddy image with the module baked in:
+The included `Dockerfile` builds a Caddy image with the module baked in:
 
 ```sh
 docker build -t caddy-njalla .
 ```
 
-## Authenticating
+## Authentication
 
-Create an API token from your Njalla account settings, under
-[Settings → API](https://njal.la/settings/api/).
+Create a token under [Settings → API](https://njal.la/settings/api/). For the
+DNS-01 challenge, pick the **ACME** option: it grants `add-record`,
+`edit-record`, `remove-record`, and `list-records`, scoped to TXT records under
+`_acme-challenge`.
 
-For the ACME DNS-01 challenge, Njalla's token editor offers an **ACME** option
-that grants exactly what is needed: `add-record`, `edit-record`,
-`remove-record`, and `list-records`, restricted to TXT records under the
-`_acme-challenge` prefix.
+The [libdns provider README](https://github.com/libdns/njalla) lists the full
+permissions and the provider's behaviour.
 
-See the [libdns provider README](https://github.com/libdns/njalla) for the full
-list of permissions and for provider-specific behaviour.
+## Usage
 
-## Config examples
+Keep the token in an environment variable. Caddy resolves
+[placeholders](https://caddyserver.com/docs/conventions#placeholders) when it
+provisions the module, and a literal string also works.
 
 ### Caddyfile
 
-Using the [`tls` directive](https://caddyserver.com/docs/caddyfile/directives/tls)
-with the DNS challenge:
+One site, through the
+[`tls` directive](https://caddyserver.com/docs/caddyfile/directives/tls):
 
 ```caddy
 tls {
@@ -51,7 +48,16 @@ tls {
 }
 ```
 
-The token may also be given in a block:
+Every site, through
+[global options](https://caddyserver.com/docs/caddyfile/options):
+
+```caddy
+{
+	acme_dns njalla {env.NJALLA_API_TOKEN}
+}
+```
+
+The token also takes a block:
 
 ```caddy
 tls {
@@ -61,24 +67,10 @@ tls {
 }
 ```
 
-To apply it to every site, set it in the
-[global options](https://caddyserver.com/docs/caddyfile/options):
-
-```caddy
-{
-	acme_dns njalla {env.NJALLA_API_TOKEN}
-}
-```
-
-Putting the token in an environment variable keeps it out of your Caddyfile.
-Any [Caddy placeholder](https://caddyserver.com/docs/conventions#placeholders)
-is resolved when the module is provisioned; a literal token works too.
-
 ### JSON
 
-To use this module for the ACME DNS challenge,
-[configure the ACME issuer](https://caddyserver.com/docs/json/apps/tls/automation/policies/issuer/acme/)
-like so:
+Configure the
+[ACME issuer](https://caddyserver.com/docs/json/apps/tls/automation/policies/issuer/acme/):
 
 ```json
 {
@@ -87,7 +79,7 @@ like so:
     "dns": {
       "provider": {
         "name": "njalla",
-        "api_token": "YOUR_NJALLA_API_TOKEN"
+        "api_token": "{env.NJALLA_API_TOKEN}"
       }
     }
   }
@@ -96,15 +88,22 @@ like so:
 
 ## Troubleshooting
 
-**`API token is empty after resolving placeholders`** — the placeholder you used
-resolved to nothing, usually because the environment variable is not set in the
-process running Caddy. Note that a systemd service does not inherit your shell's
-environment; set it with `Environment=` or an `EnvironmentFile=` in the unit.
+| Symptom                                            | Cause                                                                                                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API token is empty after resolving placeholders`  | The placeholder resolved to nothing. Set the variable for the process running Caddy. A systemd unit ignores your shell environment, so declare it with `Environment=` or `EnvironmentFile=`. |
+| The challenge record stays in the zone              | The token cannot call `remove-record` for `_acme-challenge`. Njalla's ACME token option covers it.                                                                      |
+| A wildcard certificate fails                        | Issue for the Njalla domain. Another provider serves any subdomain you have delegated away, and this module cannot write there.                                         |
+| `unrecognized subdirective`                         | The block accepts `api_token` and nothing else. Check the spelling.                                                                                                    |
 
-**Certificates fail with a DNS challenge error** — confirm the token is allowed
-to call `add-record` and `remove-record` for the `_acme-challenge` prefix. The
-ACME option in Njalla's token editor sets this up for you.
+## Testing
 
-**Wildcard certificates** — these require the DNS challenge, which is what this
-module provides. Make sure the zone you are issuing for is the Njalla domain
-itself, not a delegated subdomain.
+```sh
+go test ./...
+```
+
+Confirm the module links into a real Caddy build:
+
+```sh
+xcaddy build --with github.com/caddy-dns/njalla=.
+./caddy list-modules | grep dns.providers.njalla
+```
