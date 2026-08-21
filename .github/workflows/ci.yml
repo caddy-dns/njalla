@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+    tags: ["*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Vet and test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Verify formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
+  xcaddy:
+    runs-on: ubuntu-latest
+    name: Build Caddy with the module
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      # Proves the module still registers and links into a real Caddy build,
+      # which a plain `go build` of the package does not.
+      - name: Build with xcaddy
+        run: |
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+          xcaddy build --with github.com/caddy-dns/njalla=.
+          ./caddy list-modules | grep -x 'dns.providers.njalla'
+
+  docker:
+    runs-on: ubuntu-latest
+    name: Build the Docker image
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build only; publishing is intentionally not configured here.
+      - name: Build image
+        run: docker build -t caddy-njalla:ci .
