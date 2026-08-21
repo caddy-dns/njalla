@@ -49,6 +49,15 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// Accepting both would mean discarding one of the two tokens the
+			// user wrote, so it is rejected rather than silently ignored.
+			name: "inline argument and a block",
+			config: `njalla abc123 {
+				api_token def456
+			}`,
+			wantErr: true,
+		},
+		{
 			name: "unrecognized subdirective",
 			config: `njalla {
 				api_key abc123

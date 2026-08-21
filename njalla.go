@@ -49,25 +49,31 @@ func (p *Provider) Provision(ctx caddy.Context) error {
 func (p *Provider) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	d.Next() // consume the directive name
 
-	if d.NextArg() {
+	inlineToken := d.NextArg()
+	if inlineToken {
 		p.Provider.APIToken = d.Val()
-	} else {
-		for nesting := d.Nesting(); d.NextBlock(nesting); {
-			switch d.Val() {
-			case "api_token":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				p.Provider.APIToken = d.Val()
-			default:
-				return d.Errf("unrecognized subdirective '%s'", d.Val())
-			}
+		if d.NextArg() {
+			return d.Errf("unexpected argument '%s'", d.Val())
 		}
 	}
 
-	if d.NextArg() {
-		return d.Errf("unexpected argument '%s'", d.Val())
+	for nesting := d.Nesting(); d.NextBlock(nesting); {
+		// Reject a block alongside the inline token. Accepting both would
+		// mean silently discarding one of the two tokens the user wrote.
+		if inlineToken {
+			return d.Err("specify the API token either as an argument or in a block")
+		}
+		switch d.Val() {
+		case "api_token":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			p.Provider.APIToken = d.Val()
+		default:
+			return d.Errf("unrecognized subdirective '%s'", d.Val())
+		}
 	}
+
 	if p.Provider.APIToken == "" {
 		return d.Err("missing API token")
 	}
