@@ -92,7 +92,7 @@ Configure the
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `API token is empty after resolving placeholders`  | The placeholder resolved to nothing. Set the variable for the process running Caddy. A systemd unit ignores your shell environment, so declare it with `Environment=` or `EnvironmentFile=`. |
 | The challenge record stays in the zone              | The token cannot call `remove-record` for `_acme-challenge`. Njalla's ACME token option covers it.                                                                      |
-| A wildcard certificate fails                        | Issue for the Njalla domain. Another provider serves any subdomain you have delegated away, and this module cannot write there.                                         |
+| A wildcard certificate fails                        | Request the certificate for the Njalla domain. If you delegated a subdomain elsewhere, that provider serves it and this module cannot write there.                                         |
 | `unrecognized subdirective`                         | The block accepts `api_token` and nothing else. Check the spelling.                                                                                                    |
 
 ## Testing
