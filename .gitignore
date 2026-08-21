@@ -1,0 +1,6 @@
+# Binaries produced by xcaddy builds
+/caddy
+
+# Test binaries and coverage output
+*.test
+coverage.out
